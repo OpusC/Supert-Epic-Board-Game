@@ -1,0 +1,17 @@
+# Godot 4+ specific ignores
+.godot/
+.import/
+export.cfg
+export_credentials.cfg
+
+# Godot-generated import files for uncompressed assets
+*.translation
+
+# Mono-specific, if you ever add C#
+.mono/
+data_*/
+mono_crash.*.json
+
+# System/editor files
+.DS_Store
+*.tmp``
