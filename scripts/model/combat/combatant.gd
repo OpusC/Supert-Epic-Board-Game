@@ -7,7 +7,6 @@ signal died(combatant: Combatant)
 var display_name: String
 var max_health: int
 var health: int
-var actions: int
 var block: int = 0
 var board_position: Vector2i
 

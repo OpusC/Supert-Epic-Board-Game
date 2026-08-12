@@ -1,0 +1,143 @@
+Keep in mind that cards / classes are probably going to be designed by the game designer in another tool that we make for them
+# Data models 
+- All should extend RefCounted by default
+
+## board
+### fields
+- player_grid : Array[Array[combatant] // size 3] // size 2
+- enemy_grid : Array[combatant] // size 3
+
+### methods
+- get_front_of(position : int) // retrieves the front of a given player column
+- get_player_grid(position : vector2i) // get the player combatant at the coordinates in position in the player_grid
+- get_enemy_grid(position : int) // get the enemy combatant at the coordinates in position
+
+## signals needed
+- on_damage
+- on_block
+- died
+- swapped(swapper: character, swapee: character, positions: Array[Vector2i]) // should be fired if you swap with another player
+
+## battle_state
+
+
+##
+combatant.gd
+## fields
+- display_name
+- max_health
+- health
+- block
+- board_position # actually enemies might not need this even as only their attachs target rows, but they are in all rows
+
+## signals
+signal health_changed(new_health: int, max_health: int)
+signal block_changed(new_block: int)
+signal died(combatant: Combatant)
+
+## methods
+take_damge(amount: int) -> void: emits health_change, died
+heal(amount: int) -> void: emits health_change
+add_block(amount: int) -> void: emits block_changed
+clear_block() -> void: emits block_changed
+
+## card
+cards are meant to be loaded from serialized so game designers can tweak them easily
+### fields
+- id: int
+- cost: int
+- displayName : String
+- description : String
+- effect: Array[iEffect]
+	- effect is hard. there are cards like "reposition anywhere, gain 1 block
+	if you swapped with another player"
+	- sometimes cards interact with a classes ability
+	- example for assassain:
+	Passive: Slip Stream, Every time you are swapped with an ally, you gain 1 momentum (3 max).
+	- If you deal M, you add 2M for each momentum you have
+	- If you take damage, you gain 1 block for each momentum you have
+	- You lose all momentum after you deal M damage or take damage
+
+	and how a card may interact
+	- Quick Attack (1 cost) x2
+	2M, you may choose to not spend your momentum
+	- Acrobatics (1 cost) x2
+	Reposition, then gain 2 momentum
+
+## iEffect interfact
+- apply(context : EffectContext) -> void // I think I can be very flexible here if gdscript uses 
+ducktyping if would be really troublesome to think of every single possible and future 
+design the game designer may want right away
+
+I believe context for now may require the following:
+- an enum for which type of effectStep this is // I don't know if this is needed in godot
+- damage: int // optional
+- source: character
+- target: character
+- area: Vector2i // sometimes there is no one target, but an area to target
+
+## EffectContext
+### fields
+- source : Combatant
+- targets : Array[Combatant] // I guess there is a class that resolves the targets of AOE effects
+- board : Board
+- eventBus : CombatEventBus
+
+Here are some examples of implementations of this interface
+
+## DamageStep
+- int : damage
+- damage_type : DamageType # melee or ranged
+- 
+
+## class
+this class is meant to be configured / serialized from a tool the game designers use
+we need it to be flexible and configurable
+### fields
+starting deck : array[card] # should this be card or card id?
+starting_health
+passive
+	- designing the passive ability is hard, they are very unique to each class and
+	can interact with cards sometimes
+
+##
+player_combatant
+### fields
+- class: class
+- deck: deck
+- is_turn : bool
+- passive : passive
+
+## deck
+### fields
+- drawPile : Array[card]
+- hand : Array[card]
+- discardPile : Array[card]
+- exhaustPile : Array[card]
+
+### methods
+- move_card_to_discard(card : card)
+- move_card_to_exhaust(card: card)
+// I wonder if deck owns this. I don't know what this will do, it isn't really play
+card because the player or the battle engine should do that as it needs the context
+to pass in with targets etc
+- draw_hand(amount : int) -> void
+_ draw_next_card() -> void
+- reshuffle_discard_into_draw_pile() -> void:
+
+## passive
+- Essentially a resource counter with unique actions you can take by spending them
+Cards can also act on this, I guess this will be baked into the iEffect implementations
+### fields
+- display_name : String
+- amount : int
+- actions : Array[iEffect]
+- trigger : signal // the signal that the passive should listen to for charging. might need more information to work properly like source, target, etc
+
+###
+
+## battle controller
+### fields
+- combatants: Array[combatant]
+- turn : enum of Enemy or Player
+- is_over signal
