@@ -1,4 +1,6 @@
 Keep in mind that cards / classes are probably going to be designed by the game designer in another tool that we make for them
+- As a note: I think we may prefer to build a tool for the game designer to edit the values of the cards, rather than use json and get
+them to edit that
 # Data models 
 - All should extend RefCounted by default
 
@@ -18,9 +20,6 @@ Keep in mind that cards / classes are probably going to be designed by the game 
 - died
 - swapped(swapper: character, swapee: character, positions: Array[Vector2i]) // should be fired if you swap with another player
 
-## battle_state
-
-
 ##
 combatant.gd
 ## fields
@@ -28,7 +27,6 @@ combatant.gd
 - max_health
 - health
 - block
-- board_position # actually enemies might not need this even as only their attachs target rows, but they are in all rows
 
 ## signals
 signal health_changed(new_health: int, max_health: int)
@@ -69,9 +67,8 @@ cards are meant to be loaded from serialized so game designers can tweak them ea
 ducktyping if would be really troublesome to think of every single possible and future 
 design the game designer may want right away
 
-I believe context for now may require the following:
+Below are fields, but these can easily be wrapped in a class called effectContext
 - an enum for which type of effectStep this is // I don't know if this is needed in godot
-- damage: int // optional
 - source: character
 - target: character
 - area: Vector2i // sometimes there is no one target, but an area to target
@@ -89,6 +86,17 @@ Here are some examples of implementations of this interface
 - int : damage
 - damage_type : DamageType # melee or ranged
 - 
+
+## enemy attack
+effect : Array[iEffect]
+weight : int // the random weight for this to be chosen at.
+
+## enemy template
+# the data driven version of an enemy
+display_name
+max_health
+attacks : enemyAttack
+
 
 ## class
 this class is meant to be configured / serialized from a tool the game designers use
@@ -136,8 +144,78 @@ Cards can also act on this, I guess this will be baked into the iEffect implemen
 
 ###
 
+## battleState
+enum:
+running
+player_win
+enemy_win
+
+## turn:
+enum:
+PLAYERS
+ENEMY
+
+## battle
+fields:
+// board and combatants both have references to the combatants. because it is a reference they stay in sync
+// the combatants field here can be used to easily check if someone/something dies
+// which actually this check should be done pretty much always after some damage is dealth I think, not once per round
+- enemy : Array[combatant]
+- players : Array[combatant]
+- board : Board
+- battleState : enum
+- turn : enum
+- pendingPlayers : Array[combatant] // if this is 0 then all players have signalled that their turn is done
+
+- on_player_turn_over_signal(player : combatant) // player signals their turn is over so remove them from pendingPlayers
+- on_player_turn_not_over_signal(player : combatant) // re-add player to pendingPlayers if they are not there already
+
+methods:
+validateMove()		    // checks if the move is playable, meaning the source target has enough energy
+resolve(move : moveContext)
+	var result = move.execute(board, battle_state)
+	combat_event_but.move_resolved(move, result)
+	
+
+
+on_card_played(card, target):
+	var move = build_move_context(card, target)
+	if validate_move(move):
+		resolve(move)
+		combat_event_bus.move_resolved.emit(move)  # presentation hooks this
+
+## CombatPresenter
+extends Node
+animation_queue : Array = []
+var is_playing : bool = false
+
+func _ready()
+	combat_event_bus.move_resolved.connect(_on_move_resolved)
+
+func _on_move_resolved(move, result):
+	animation_queue.append(move)
+	if not is_playing:
+		_play_next()
+
+func _play_next():
+	if animation_queue.is_empty():
+		return
+	var move = animation_queue.pop_front()
+	var animation = get_animation_for(move)
+	await anim.finished
+	_play_next()
+
+## HealthBar
+func _on_move_resolved(move, result):
+	if result.target == watched_combatant:
+		await animation_finished_for(move)
+		var tween = create_tween()
+		tween.tween_property(self, "value", result.new_health, 0.3)
+
 ## battle controller
 ### fields
-- combatants: Array[combatant]
-- turn : enum of Enemy or Player
-- is_over signal
+// responsible for instantiating battle, picking the enemy for the battle, etc
+
+startBattle(players : Array[combatant], floor) // floor determines what enemy gets picked
+
+## 
