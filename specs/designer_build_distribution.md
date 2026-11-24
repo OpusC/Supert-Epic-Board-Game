@@ -1,0 +1,6 @@
+# Designer build distribution
+
+1. Add a manually triggered **Build Designer ZIP** workflow to the private GitHub repo. Build from a selected commit or tag and name each ZIP with its revision and target platform. Bundle the project snapshot, a pinned Godot editor for that platform, its license notices, and an **Open Card Editor** launcher. Exclude Git history, local caches, and credentials. Run the project's headless checks before publishing.
+2. Start on a GitHub-hosted runner and publish the ZIP as a workflow artifact for the maintainer to download. Use the home server runner if needed once it is registered for this repo, online, and selectable by its runner label. Run packaging from trusted revisions.
+3. Add an upload step to the workflow after packaging is reliable. Upload the versioned ZIP to a restricted Google Drive folder, or Dropbox if the team uses it, with credentials scoped to the destination. Give designers and testers download access to that folder so they can get approved builds without access to the GitHub repo. Keep the previous ZIP available and update the latest-build link only after the new upload succeeds.
+4. Publish a fresh build after reviewed designer card edits are merged. Keep the card export ZIP as the way to submit edits and the designer build ZIP as the way to distribute the game, editor, and approved cards together.
