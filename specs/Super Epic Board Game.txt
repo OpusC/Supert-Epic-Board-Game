@@ -1,0 +1,268 @@
+﻿Brief: cooperative RPG where you pick characters to fight against monsters
+
+
+Mechanics
+* Divided into 4 acts (1 starting, and 3 normal)
+   * Roll a die to determine which encounter or event
+   * Each act require a minimum number of encounters to face the boss
+* 2 rows on the player side, with 3 slots each row
+   * Players in the front will take the damage, shielding the player behind
+   * If the player behind has nobody in front, they still take damage
+   * Players can switch positions using Reposition
+   * Melee attacks can only hit adjacent spaces (orthogonal)
+   * Ranged attacks can hit any non-adjacent space
+   * Special attacks can hit any spaces
+* Each turn, each player draws 6 cards to start
+* Each action has a cost attached to them, which is discarding a player’s hand
+* Players can go in any order
+* When everyone is done, the enemy attacks and deals damage accordingly
+   * All enemy attacks hit the front row first, if it’s empty, they will hit the back row
+   * Wide attacks hit the unit in front and adjacent to them
+   * Row attacks hit all units in that row
+   * Enemy has up to 6 different attacks based on dice rolled
+   * Each attack has an area that can be hit
+   * Also different HP pools depending on number of player
+   * Enemies can take up multiple spaces, making them susceptible to more damage
+* Heal after every combat? Level up actions?
+
+
+Elemental Tokens
+Wind (buff): discard to Reposition at no cost
+Poison (debuff): unit takes 1 damage at the end of its phase, not discarded
+Earth (buff): discard as 1 energy when playing cards
+Water (buff): discard to heal 1 HP during Hero Phase
+Fire (debuff): discard to deal 3 damage during Enemy Phase
+Lightning (buff): the unit’s next attack do +1 damage
+Light (buff): the unit receives -1 damage from the next attack
+Dark (debuff): the unit takes +1 damage from the next attack
+
+
+Paladin (12 HP)
+Talent: Farore’s Blessing
+Gain 1 blessing at the start of combat. You use blessing to do one of the following at 1 cost once per turn:
+* Renew: Heal 2 HP to any ally
+* Smite: 4S
+* Aegis: 3 block to any ally
+
+
+Starting cards:
+* Invocation (1 cost) x2
+   * Reposition, gain 1 blessing
+* Slash (1 cost) x3
+   * 2M
+* Shield Bash (1 cost) x2
+   * 1M and 2 block
+* Wide Guard (2 cost) x1
+   * Distribute 5 block across any allies
+* Meditate (0 cost) x1
+   * 1 block, gain 1 blessing
+* Rally (1 cost) x1
+   * You deal +2 damage and adjacent allies deal +1 damage this turn
+* Luminous (0 cost) x2
+   * If this card was discarded for a blessing, +1 to the effect
+
+
+Passives:
+* Divine Smite: Your Smites now also inflict 1 Light
+
+
+Ultimates (4 cost):
+* Transcendence: Use one of your blessings 4 times at no cost.
+
+
+Assassin (10 HP)
+Talent: Slip Stream
+Every time you Reposition, you gain 1 momentum (3 max).
+* When you deal M, you add 2M for each momentum you have
+* When you take damage, you gain 1 block for each momentum you have
+You lose all momentum after
+
+
+Starting cards:
+* Swiftness (0 cost) x2
+   * Reposition, gain 1 block
+* Stab (1 cost) x3
+   * 2M
+* Quick Attack (2 cost) x2
+   * 1M, regain all the momentum spent
+* Acrobatics (1 cost) x2
+   * Reposition, then gain 1 momentum
+* Parry (1 cost) x1
+   * 2 block and draw 1 card
+* Dual Daggers (1 cost) x1
+   * 1M and 1R
+* Wind Wall (1 cost) x1
+   * Lose all momentum and gain 2 block for each momentum lost
+
+
+Passives:
+* Tailwind: At the start of each turn, gain 1 Wind
+
+
+Ultimates (4 cost):
+* Assassinate: Double your current momentum (can go above max), then 5M
+
+
+Gladiator (12 HP)
+Talent: Battle Frenzy
+Every time you deal or take damage, you receive 1 rage (7 max).
+* At max rage, you enter Berserk and draw 3 cards
+* During Berserk, all your M and R attacks do +3 damage
+* At the end of Hero Phase, you exit Berserk and lose all rage
+
+
+Starting cards:
+* Tactical Retreat (1 cost) x2
+   * Reposition, 1M
+* Thrust (1 cost) x3
+   * 2M / 1R
+* Second Wind (1 cost) x2
+   * +2 HP, lose 1 rage
+* Rapid Jab (1 cost) x1
+   * 1M / 1R x3
+* Wild Abandon (1 cost) x1
+   * Take 1M damage, then deal 5M
+* Defensive Stance (1 cost) x2
+   * 3 block in front row, or 2 block and 1R in back row
+* Polearm Strike (0 cost) x1
+   * 1M or 1 block
+
+
+Passives:
+* Energy Surge: Upon entering Berserk, gain 2 Lightning
+
+
+Ultimates (4 cost):
+* Ragnarok: Enter Berserk, gain 2 Lightning, lose all your Rage and heal 1 for every Rage lost.
+
+
+Huntress (10 HP)
+Talent: Huntress’s Mark
+Your companion, Mark, joins you in battle and can occupy any space. Mark can’t take damage or be killed.
+* If on an ally, Mark provides 2 block to that ally at the end of Hero Phase
+* If on an enemy, it receives +1 damage from all sources
+* Mark can move anywhere when the Huntress is swapped
+
+
+Talent: Swift Quiver
+Gain 3 Swift Arrows at the start of combat. You can use up any number of Swift Arrows at any time during Hero Phase for the following:
+* 1 Swift Arrow: 1S
+* 3 Swift Arrows: Reposition
+* 5 Swift Arrows: Draw 2 cards
+
+
+Starting cards:
+* Pounce (1 cost) x2
+   * Reposition, gain 1 Swift Arrow
+* Shoot (1 cost) x3
+   * 1M or 3R
+* Volley (2 cost) x1
+   * 2R x3
+* Heartseeker (1 cost) x2
+   * All R do +1 damage this turn
+* Go for the Eyes! (1 cost) x1
+   * 1M, Reposition
+* Quick Draw (0 cost) x1
+   * Gain 2 Swift Arrows
+* Take Cover (1 cost) x2
+   * Gain 2 block, lose 1 Swift Arrow
+
+
+Passives
+* Tremor: you may use 2 Swift Arrows to gain 1 Earth
+
+
+Ultimates (4 cost):
+* Arrow Storm: 2R/2S x5
+
+
+Starting Enemies
+
+
+King Slime
+	Left Slime Arm
+	King Slime
+	Right Slime Arm
+	10/20/30/40
+	20/40/60/80
+	10/20/30/40
+	1-2: 2M, 1R
+3-4 3M
+5-6: 4M
+	1-2: 3M, 1R
+3-4: 4M
+5-6: 2S all
+	1-2: 4M
+3-4: 3M
+5-6: 2M, 1R
+	1-6: 2M
+	
+
+	1-6: 2M
+	
+
+
+
+Turtle Mage
+	Power Orb
+	Turtle Mage
+	Power Orb
+	5/10/15/20
+	20/40/60/80
+	5/10/15/20
+	1-3: Add 2 dmg to the Boss’s next attack
+4-6: 2M
+	1: 2S (2, 5)
+2-4: 2S (1, 2, 3)
+5-6: 2S (2, 4, 5, 6)
+	1-3: 2M
+4-6: Add 2 dmg to the Boss’s next attack
+	1-6: 2M
+	
+
+	1-6: 2M
+	
+
+
+
+-
+	
+
+	
+
+	
+
+	10/20/30/40
+	
+
+	10/20/30/40
+	Deal 2S cross centered on [dice]
+	
+
+	Deal 2S cross centered on [dice]
+	Deal 2S on [dice]
+	
+
+	Deal 2S on [dice]
+	
+
+Act I Enemies
+
+
+Soul Warden
+	Death Scythe
+	Soul Warden
+	Soul Lantern
+	10/20/30/40
+	25/50/75/100
+	10/20/30/40
+	Reposition the hero with lowest HP to space 1
+3M, 1R
+	1-3: 3S all
+4-6: 4S all
+	If your HP drops to 3 or less at the end of Hero Phase, die
+	2M, 1R
+	
+
+	If your HP drops to 1 or less at the end of Hero Phase, die
+	________________

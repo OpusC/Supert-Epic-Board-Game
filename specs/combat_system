@@ -1,221 +1,202 @@
-Keep in mind that cards / classes are probably going to be designed by the game designer in another tool that we make for them
-- As a note: I think we may prefer to build a tool for the game designer to edit the values of the cards, rather than use json and get
-them to edit that
-# Data models 
-- All should extend RefCounted by default
+# Combat system design
 
-## board
-### fields
-- player_grid : Array[Array[combatant] // size 3] // size 2
-- enemy_grid : Array[combatant] // size 3
+Use typed Godot Resources for authored content, a synchronous combat resolver for gameplay, and one presenter that animates the resolver's ordered results. A card play is one command. Resolution runs synchronously until a choice or the end of the action. Its result can contain several hits, moves, and reactions, each with enough information for the presenter to show what happened at that point.
 
-### methods
-- get_front_of(position : int) // retrieves the front of a given player column
-- get_player_grid(position : vector2i) // get the player combatant at the coordinates in position in the player_grid
-- get_enemy_grid(position : int) // get the enemy combatant at the coordinates in position
+Use “Super Epic Board Game.txt” for card text and values. In particular, Quick Attack costs 2, deals 1 melee, and restores Momentum spent. Acrobatics grants 1 Momentum after Reposition. Slip Stream uses the game design's Reposition wording provisionally. Confirm whether it also triggers for a displaced Assassin or only for the actor taking the action.
 
-## signals needed
-- on_damage
-- on_block
-- died
-- swapped(swapper: character, swapee: character, positions: Array[Vector2i]) // should be fired if you swap with another player
+## Card authoring
 
-##
-combatant.gd
-## fields
-- display_name
-- max_health
-- health
-- block
+Card authoring lives inside Godot in a dedicated Cards workspace built as an EditorPlugin. Godot Resources are the source of truth for both authoring and play. Save one custom Resource per card as a text `.tres` file and share those same resources in the export ZIP. Use the Inspector to build the first vertical slice before implementing the workspace. A dock suits a compact list and form, while a main-screen plugin gives the step editor and sandbox more room. Godot documents EditorDock as experimental, so keep the card editing Control independent of the plugin container. [Godot Resources](https://docs.godotengine.org/en/stable/tutorials/scripting/resources.html) · [Godot EditorDock](https://docs.godotengine.org/en/stable/classes/class_editordock.html)
 
-## signals
-signal health_changed(new_health: int, max_health: int)
-signal block_changed(new_block: int)
-signal died(combatant: Combatant)
+| Definition | Saved fields |
+| --- | --- |
+| Card | Stable ID, name, cost, rules text, ordered effects, optional art and presentation profile |
+| Class | Stable ID, name, starting HP, starting deck entries (card reference and count), talent definitions, unlockable passives and ultimate |
+| Ability or passive | Stable ID, editable parameters, effect list or registered rule, cost and phase restrictions for activated abilities |
+| Enemy | HP by player count, footprint or part layout, roll-to-pattern table, effects and any part-specific rules |
 
-## methods
-take_damge(amount: int) -> void: emits health_change, died
-heal(amount: int) -> void: emits health_change
-add_block(amount: int) -> void: emits block_changed
-clear_block() -> void: emits block_changed
+Use Resource references when assembling decks and catalogs in Godot. Use stable IDs in commands, saved games, and logs. Each physical copy gets a separate runtime instance ID so the resolver can distinguish playing one Stab from discarding another as payment. Treat loaded definitions and nested step Resources as read-only during play because Resources can be shared. Keep counters, once-per-turn flags, tokens, hand and deck zones on runtime objects. [Godot Resources](https://docs.godotengine.org/en/stable/tutorials/scripting/resources.html)
 
-## card
-cards are meant to be loaded from serialized so game designers can tweak them easily
-### fields
-- id: int
-- cost: int
-- displayName : String
-- description : String
-- effect: Array[iEffect]
-	- effect is hard. there are cards like "reposition anywhere, gain 1 block
-	if you swapped with another player"
-	- sometimes cards interact with a classes ability
-	- example for assassain:
-	Passive: Slip Stream, Every time you are swapped with an ally, you gain 1 momentum (3 max).
-	- If you deal M, you add 2M for each momentum you have
-	- If you take damage, you gain 1 block for each momentum you have
-	- You lose all momentum after you deal M damage or take damage
+The Cards workspace should let the designer filter and duplicate cards, edit cost and text, and add or reorder named steps. Selecting Attack reveals damage, attack type, and a targeting form. Selecting Distribute Block reveals a total and eligible recipients. A choice or repeat exposes its child steps. Use typed selectors for classes, counters, targeting, and named special rules, with tooltips describing when each runs. Duplicate with a fresh card ID and independent embedded steps. Show a card preview and a sandbox that runs the same validator and resolver as the game, with editable board, hand, tokens, and seed so a designer can reproduce an interaction.
 
-	and how a card may interact
-	- Quick Attack (1 cost) x2
-	2M, you may choose to not spend your momentum
-	- Acrobatics (1 cost) x2
-	Reposition, then gain 2 momentum
+Use editor undo/redo. Validate missing references, duplicate IDs, negative costs, invalid targeting, empty branches, missing parameters and unsupported effect configurations. Show errors at the offending step and run the same content checks headlessly. Keep rules prose editable and show the structured effect summary beside it so discrepancies are visible during review.
 
-## iEffect interfact
-- apply(context : EffectContext) -> void // I think I can be very flexible here if gdscript uses 
-ducktyping if would be really troublesome to think of every single possible and future 
-design the game designer may want right away
+| Authoring option | Tradeoff |
+| --- | --- |
+| Inspector and Resources | Fastest for prototyping. Nested choices, repeats, and deck-wide editing become cumbersome. |
+| Dedicated editor over the same Resources | Designer-friendly fields and previews, with one file format and one validator. Adds editor UI maintenance. |
+| Script per card or a general visual scripting graph | Scripts handle exceptional mechanics well but shift everyday edits to developers. A general graph adds authoring and debugging work before the starter set establishes which primitives recur. |
 
-Below are fields, but these can easily be wrapped in a class called effectContext
-- an enum for which type of effectStep this is // I don't know if this is needed in godot
-- source: character
-- target: character
-- area: Vector2i // sometimes there is no one target, but an area to target
+### Saving and sharing cards
 
-## EffectContext
-### fields
-- source : Combatant
-- targets : Array[Combatant] // I guess there is a class that resolves the targets of AOE effects
-- board : Board
-- eventBus : CombatEventBus
+**Save** writes the current card to its local `.tres` file in the designer's copy of the Godot project. There is no Git commit, push, or upload. The designer can start from a ZIP of the project you provide, extract it, and open `project.godot` in Godot.
 
-Here are some examples of implementations of this interface
+**Export Card Designs** packages selected saved cards, or the full card catalog, into one ZIP for sharing by email or a shared folder. Prompt the designer to save pending edits before export. Include a manifest with the original project revision, format version, stable card IDs, and baseline hashes for the selected cards. Include any new or changed art those cards reference. The recipient's editor imports the package into their own project. It checks required assets and registered rules, then previews new, changed, unchanged, and conflicting cards before applying approved changes locally. Match cards by ID so a rename updates the existing card. Flag conflicts when both sides changed the same card since the baseline and let the recipient choose which version to keep. Deleting a card requires an explicit action in the recipient's project.
 
-## DamageStep
-- int : damage
-- damage_type : DamageType # melee or ranged
-- 
+You can give the designer this instruction. “Save your cards in Godot, choose Export Card Designs, select the cards you changed, and send me the ZIP. I'll import and review them.” You handle the Git commit and push from your own project after review. Send the designer a fresh project ZIP after merging changes when they need the updated catalog or new effect types.
 
-## enemy attack
-effect : Array[iEffect]
-weight : int // the random weight for this to be chosen at.
+### Spelling underlines
 
-## enemy template
-# the data driven version of an enemy
-display_name
-max_health
-attacks : enemyAttack
+Use Hunspell through a small C++ GDExtension built with godot-cpp. Bundle the English dictionary and prebuilt extension for the designer’s Godot version and platform in the project ZIP. Load the dictionary once and check the edited field after a short pause in typing. Keep the spellchecker in the editor workflow. [Hunspell](https://github.com/hunspell/hunspell) · [Godot C++ GDExtension guide](https://docs.godotengine.org/en/stable/tutorials/scripting/cpp/gdextension_cpp_example.html)
 
+Underline possible typos in the card name and rules text as the designer types. Use an offline English dictionary and a shared game vocabulary that can include terms such as Reposition, Berserk, and Farore. Provide a way to add approved terms to the project vocabulary and include vocabulary additions in exports for review. Underlines are editor-only hints and allow saving and exporting. There is no autocorrect and the exported text preserves what the designer typed.
 
-## class
-this class is meant to be configured / serialized from a tool the game designers use
-we need it to be flexible and configurable
-### fields
-starting deck : array[card] # should this be card or card id?
-starting_health
-passive
-	- designing the passive ability is hard, they are very unique to each class and
-	can interact with cards sometimes
+## How the game handles an action
 
-##
-player_combatant
-### fields
-- class: class
-- deck: deck
-- is_turn : bool
-- passive : passive
+### What a battle keeps track of
 
-## deck
-### fields
-- drawPile : Array[card]
-- hand : Array[card]
-- discardPile : Array[card]
-- exhaustPile : Array[card]
+A battle remembers whose phase it is, which heroes still have to finish, where units stand, and each unit's HP, block, tokens, counters, and cards. The deck handles moving cards between piles and reshuffling. Each copy of a card has its own ID so you can play one Stab and pay by discarding another. The battle also keeps a seeded random number generator so the same starting setup and choices can reproduce a roll or shuffle. Keep this live state in RefCounted models such as the existing Combatant.
 
-### methods
-- move_card_to_discard(card : card)
-- move_card_to_exhaust(card: card)
-// I wonder if deck owns this. I don't know what this will do, it isn't really play
-card because the player or the battle engine should do that as it needs the context
-to pass in with targets etc
-- draw_hand(amount : int) -> void
-_ draw_next_card() -> void
-- reshuffle_discard_into_draw_pile() -> void:
+The board tracks cells and occupants. Targeting rules use the board to answer questions about distance, shielding, and which cells an enemy attack covers. Mark can share a cell with a unit. A Slime Arm has its own HP, while a single enemy with one HP pool can occupy several cells. When an area covers more than one of those cells, the attack specifies whether to hit that unit once or once per covered cell.
 
-## passive
-- Essentially a resource counter with unique actions you can take by spending them
-Cards can also act on this, I guess this will be baked into the iEffect implementations
-### fields
-- display_name : String
-- amount : int
-- actions : Array[iEffect]
-- trigger : signal // the signal that the passive should listen to for charging. might need more information to work properly like source, target, etc
+### What happens when someone acts
 
-###
+1. The BattleController sets up the encounter and sends the player's request to the CombatResolver. To play a card, the request says who is playing, which copy they chose, which cards or Earth they are spending, and any choices they have already made. Using a blessing, spending Swift Arrows, using a token, using Reposition on its own, and ending a hero's turn go through the same rules. The resolver also handles enemy rolls, phase changes, and automatic effects.
+2. The resolver checks whose phase it is, whether the hero can act, whether they have the card and can pay, and whether their choices are legal. A rejected request changes nothing, including the hand, counters, HP, and upcoming random rolls.
+3. Once accepted, the resolver records the played card's move out of the hand separately from the cards discarded to pay. Each discard records what it paid for, so Luminous can tell when it was discarded for a blessing. The resolver carries out effects in order and applies any reactions at the timing the rules specify. Combatant's methods can still update basic values such as HP. Its current healing calculation needs to add HP up to the unit's maximum.
+4. The resolver reports what happened in order, so the screen can show the card, its effects, and any reactions at the right moments. It can also report a choice mid-action when the next step needs more input.
 
-## battleState
-enum:
-running
-player_win
-enemy_win
+### When the player chooses
 
-## turn:
-enum:
-PLAYERS
-ENEMY
+Ask up front for choices that can already be made, such as picking a mode for Shoot, allocating Wide Guard's block, or choosing a Reposition destination. Check choices that depend on an earlier effect against the board at the moment they are used. For example, Tactical Retreat checks melee range from the hero's new position.
 
-## battle
-fields:
-// board and combatants both have references to the combatants. because it is a reference they stay in sync
-// the combatants field here can be used to easily check if someone/something dies
-// which actually this check should be done pretty much always after some damage is dealth I think, not once per round
-- enemy : Array[combatant]
-- players : Array[combatant]
-- board : Board
-- battleState : enum
-- turn : enum
-- pendingPlayers : Array[combatant] // if this is 0 then all players have signalled that their turn is done
+If a choice depends on what just happened, finish that part, report its results, and pause the current action. The player sees the legal options and answers that specific prompt. The resolver accepts one valid answer and picks up where it paused. Other actions wait until the current one finishes. The player can cancel before committing. After committing, the action needs a valid answer or a fallback defined by the rules. If a target disappears, the effect determines what happens next, such as skipping that hit or asking for another target.
 
-- on_player_turn_over_signal(player : combatant) // player signals their turn is over so remove them from pendingPlayers
-- on_player_turn_not_over_signal(player : combatant) // re-add player to pendingPlayers if they are not there already
+## Cooperative multiplayer
 
-methods:
-validateMove()		    // checks if the move is playable, meaning the source target has enough energy
-resolve(move : moveContext)
-	var result = move.execute(board, battle_state)
-	combat_event_but.move_resolved(move, result)
-	
+Support one to four heroes in an encounter. A player can host a game and friends can join. Before combat, each player chooses their hero in the lobby. The host records which player controls each hero and sets up that hero's own deck, hand, talents, and resources. Whether multiple players can pick the same hero is a lobby rule to confirm.
 
+### How simultaneous submissions work
 
-on_card_played(card, target):
-	var move = build_move_context(card, target)
-	if validate_move(move):
-		resolve(move)
-		combat_event_bus.move_resolved.emit(move)  # presentation hooks this
+- During Hero Phase, every player who is still active may select and submit cards for their own hero. Players can submit while someone else's card is resolving or animating.
+- The host puts requests in a single first-in, first-out queue. Submission order means the order the host receives requests. The host assigns a sequence number and sends the same order to every player. Use the same path for a solo game, with the host running locally.
+- Resolve one action at a time in that order, including its reactions. When a request reaches the front, validate it against the current battle. An earlier card might move or defeat the target or change the hand. If a request fails before payment, explain why to its player, remove it from the queue, and continue. Use request IDs so a repeated submission can be acknowledged without playing it twice.
+- If a committed action needs a follow-up choice, only the player who owns the choice can answer. The resolver pauses that action and holds later actions in order while waiting. The group can still submit requests during the pause.
+- Ending a hero's turn goes through the same queue, behind their earlier plays. Start Enemy Phase once all active heroes have finished and the ordered Hero Phase work is settled. Playback speed and skipping animation have no effect on this transition.
 
-## CombatPresenter
-extends Node
-animation_queue : Array = []
-var is_playing : bool = false
+### What players see
 
-func _ready()
-	combat_event_bus.move_resolved.connect(_on_move_resolved)
+Show one shared stack of submitted cards in the center of the battle. Add a card when the host acknowledges its place in the queue. Display the next card at the front of the stack and pop it when its animation starts. If a request is rejected before playback, remove its entry without playing it. Use the action ID to match stack entries to results, including actions that send several result segments because they paused for a choice.
 
-func _on_move_resolved(move, result):
-	animation_queue.append(move)
-	if not is_playing:
-		_play_next()
+The host owns the live combat state. Each player gets the public board, visible card submissions and results, plus their own private hand and payment information. Send IDs and copied values across the network. Clients use those values to look up their local card art and animate the host's outcomes. A client's board playback may lag behind the host. Use the latest confirmed private hand for new selections, mark pending cards as committed for input, and let the host decide whether the chosen target is still legal when the request resolves.
 
-func _play_next():
-	if animation_queue.is_empty():
-		return
-	var move = animation_queue.pop_front()
-	var animation = get_animation_for(move)
-	await anim.finished
-	_play_next()
+## Effects and reactions
 
-## HealthBar
-func _on_move_resolved(move, result):
-	if result.target == watched_combatant:
-		await animation_finished_for(move)
-		var tween = create_tween()
-		tween.tween_property(self, "value", result.new_health, 0.3)
+Define a typed EffectStep Resource with exported parameters and an execution contract such as `execute(context) -> StepOutcome`. The context carries the action and source IDs, choices, access to battle queries and resolver mutation methods, and named outputs from earlier steps. A step submits operations through the context. The resolver owns their timing and state changes. Reposition can return old and new cells and whether another hero was displaced. An attack can return which resources its own modifiers consumed. Keep outputs scoped to the action or repeat iteration. Start with attack, heal, block, draw, move, change counter or token, grant timed modifier, choose, repeat, and conditional steps. Add a named scripted rule with typed parameters for cases like Slip Stream and Mark. The editor exposes those parameters in ordinary fields.
 
-## battle controller
-### fields
-// responsible for instantiating battle, picking the enemy for the battle, etc
+Use explicit hooks inside the resolver for things that can change an operation before it commits. Use typed facts after committing for things that respond to it. Godot signals can deliver published results to observers. Rules run under one resolver with explicit ordering.
 
-startBattle(players : Array[combatant], floor) // floor determines what enemy gets picked
+1. After validation, open an action and commit payment. Gather payment-specific modifiers before running the card or ability body. Expose a card-played hook after payment and before the first step, and a card-resolved hook after the body.
+2. Run each step in authored order. An attack resolves legal targets, computes modifiers, applies block and HP changes, and records both actual changes and consumed modifiers. A repeat resolves each iteration separately, including its intervening reactions. An area step explicitly defines whether its hits commit together or in stable target order.
+3. Apply immediate consequences such as removing defeated units from occupancy. Match each fact to rules by timing, owner, source, target, and reason. Drain eligible reactions before the next authored step. Give rules an explicit priority within each hook, with a stable tie-breaker such as installation sequence. Queue facts emitted by reactions behind already queued facts and recheck rule eligibility before execution. Bound reactions per action and include the causal chain in diagnostics if the bound is exceeded.
+4. Evaluate victory or defeat after immediate reactions for the operation have settled. Use a defined encounter outcome policy for simultaneous defeat and for boss fights with surviving parts. Terminal results close the action and stop remaining steps. Publish the ordered facts and final snapshot after each completed action or committed segment.
 
-## 
+For damage, keep attack type (melee, ranged, special) distinct from the cause (attack, self-damage, poison, fire, or other effect). Keep separate fields for attempted damage, block absorbed and HP lost. This lets rules specify whether they apply to any damage or only to attacks, and whether fully blocked hits qualify. Use explicit phase-start and phase-end hooks. Hero Phase tracks the set of pending heroes, who can act in any order. Once all active heroes have finished and the Hero Phase queue has settled, run end-of-phase rules, then enemy actions, then the next phase. Encode dice faces and spatial patterns explicitly for enemy attacks so the roll can both select an attack and serve as its pattern center.
+
+| Game design examples | Required behavior |
+| --- | --- |
+| Invocation, Tactical Retreat, Go for the Eyes!, Defensive Stance | Ordered movement and attacks, range checked at execution, conditional row behavior, and move facts that identify both participants in a swap. |
+| Shoot, Polearm Strike, Dual Daggers, Wide Guard | Explicit modes, separate targets for melee and ranged steps, and integer block allocation validated against a total. |
+| Rapid Jab, Volley, Arrow Storm, Transcendence | Repeat with per-iteration targeting and reactions. Model Transcendence as a nested ability invocation with an explicit cost and usage-limit policy. |
+| Farore’s Blessing, Luminous, Divine Smite | Combat-start grant, activated options, usage tracking and payment attribution. Luminous contributes to the current blessing invocation through its payment record. Divine Smite modifies Smite through its ability ID. |
+| Slip Stream, Quick Attack, Wind Wall, Assassinate | Reposition hook, outgoing melee and incoming damage hooks, and spend records. Quick Attack restores the amount consumed by its own hit. Wind Wall uses its own spend result. Assassinate explicitly bypasses the normal Momentum cap for doubling. |
+| Battle Frenzy, Wild Abandon, Energy Surge, Ragnarok | Damage facts feed Rage, crossing the threshold enters Berserk once, and entering Berserk can draw and trigger Lightning. Authored step order matters for self-damage and Rage loss. End of Hero Phase clears Berserk and Rage as applicable. |
+| Mark, Swift Quiver, Tremor | Mark's occupied cell governs incoming damage amplification and end-of-phase block. A Huntress swap can grant a relocation choice. Swift Arrows pay for Hero Phase actions with their own targeting and costs. |
+| Wind, Earth, Water, Fire, Poison, Lightning, Light, Dark | Respectively a Reposition payment, card payment, heal action, Enemy Phase damage, persistent end-of-owner-phase damage, outgoing attack modifier, and two incoming attack modifiers. Store consumption and expiration on runtime tokens. |
+| Rally, Heartseeker, Tailwind | Timed outgoing damage modifiers with explicit source eligibility, and a Wind grant at the configured turn boundary. |
+| Turtle Mage, King Slime, Soul Warden | Power Orb installs a modifier on the boss's next attack. Enemy parts have distinct HP and patterns. Enemy Reposition and end-of-Hero-Phase deaths use the same facts and consequences as hero actions. |
+
+## Presentation contract
+
+Pass one CombatResult from the resolver to a CombatPresenter Node through the controller. Start with a direct call from the controller to the presenter. A local result signal can serve additional observers if they appear. The result includes action and segment IDs, ordered facts, optional parent cause IDs, and a view snapshot at the end of the segment. Each fact carries stable entity IDs and the values required to portray it. A move stores old and new cells for each participant. A hit stores source, impacted cells, attack type, and HP and block before and after. A card reveal carries definition and instance IDs. Emit hand/count, token, status, phase and death changes as needed by the view. Copy mutable values into the result and give ownership of playback to the presenter.
+
+For example, Quick Attack can produce a card reveal, payment changes, Momentum spent, a melee hit with its damage and HP delta, eligible reactions to that hit, then Momentum restored from the spend record. At impact the presenter moves the HP bar to the hit's recorded value. If a later reaction heals the same target, the heal gets its own beat and recorded value. Reading current HP from Combatant during either beat would return the final rules value.
+
+1. Seed the presenter with the encounter snapshot. Queue incoming result batches in order. Group related facts where useful, such as simultaneous area impacts, and retain the ordering of changes that affect the same widget.
+2. Map facts to reusable cues such as card lift, projectile, lunge, impact, swap, and counter change. Let a card's optional presentation profile override the defaults for its reveal or hit. Use AnimationPlayer for authored clips and Tweens for dynamic board positions and HP values. The presenter controls sequencing and directly updates widgets at the intended cue. [Godot Tween](https://docs.godotengine.org/en/stable/classes/class_tween.html)
+3. The demo gates combat input during playback. In multiplayer, players can keep submitting during playback. The presenter gates only the display of results and prompts. Expose a pending choice only after its segment plays. Keep rules progression independent of animation callbacks. At segment end reconcile the view to its snapshot. On skip, cancel active playback, apply the latest queued snapshot, and clear the queue. Reset the queue and cancel view work on battle teardown. Missing animation assets should fall back to immediate updates.
+
+| Approach | Tradeoff |
+| --- | --- |
+| Resolve from animation callbacks | Simple to prototype a single attack. Gameplay timing then depends on scene lifetime, playback speed, and skip behavior. |
+| Bind widgets directly to live Combatant signals | Useful for simple inspectors or a static view. HP changes can appear before the hit lands, and several changes can collapse into one before the projectile arrives. |
+| Ordered results and a presenter | Needs a small event contract and a displayed state separate from the live model. Supports multi-hit timing, reactions, cancellation, and headless resolution. This is a command/result boundary with an event-driven presenter. It does not require storing an event history as the source of truth. |
+
+## Class and method contracts
+
+These are proposed GDScript interfaces. Names ending in Definition or Step are authored Resources. Live models, requests and results can be RefCounted. BattleController, CombatPresenter and CardsEditor are scene or editor Nodes. Method signatures below show intent and omit incidental parameters. Keep private helpers within their owner until a second caller needs them.
+
+### Authored definitions and editor
+
+| Class | Data and methods |
+| --- | --- |
+| CardDefinition | `id`, `display_name`, `cost`, `rules_text`, `steps: Array[EffectStep]`, optional art and presentation profile. Data only. |
+| ClassDefinition | `id`, `starting_hp`, `starting_deck: Array[DeckEntry]`, starting talents, available passives, and ultimate card reference. DeckEntry stores a CardDefinition and count. Data only. |
+| AbilityDefinition | `id`, action cost, counter or token cost, usage and phase restrictions, and ordered steps. Use for Renew, Smite, Aegis and Swift Quiver options. |
+| EnemyDefinition | Units or parts with footprint, HP by party size, attack entries keyed by die face, and starting rules. An attack entry holds steps and a targeting pattern. The chosen die face is an input to those steps. |
+| EffectStep | `execute(context) -> StepOutcome`. Leaf steps request operations. A branch, repeat or nested ability returns child steps for the resolver to schedule. Examples include AttackStep, RepositionStep, AllocateBlockStep and RepeatStep. TargetSpec describes legal cells or recipients, shielding, and hit policy. |
+| ContentCatalog | `get_card(id)`, `list_cards()`, `get_class(id)`, `get_enemy(id)`. Resolve stable IDs and detect collisions when loading the catalog. |
+| CardsEditor | `open_card(id)`, `duplicate_card(id)`, `save_card()`, `export_cards(ids, path)`, `preview_import(path)`, `apply_import(plan)`, `run_sandbox(setup, commands)`. Own the editable draft and undo history. The plugin creates and removes this Control. Extract package IO when the import and export workflow is built. |
+| ContentValidator | `validate_card(card, catalog) -> Array[ContentIssue]` and `validate_catalog(catalog) -> Array[ContentIssue]`. Issues carry the property or step path, severity and message. The editor, import preview and headless checks use the same validator. |
+| Spellchecker | `find_misspellings(text) -> Array[TextRange]`, `set_project_words(words)`. The editor debounces requests and applies returned ranges only to the text version checked. The C++ binding owns Hunspell and its dictionary. |
+
+Save swaps the validated draft into the editor catalog after the file write succeeds. A sandbox battle uses its own state and the draft definition it started with. Match ZIP imports by ID, resolve Resource references to local files, and check declared dependencies before applying the reviewed plan.
+
+### Battle state, board and deck
+
+| Class | Data and methods |
+| --- | --- |
+| BattleState | Unit and deck maps, phase, round, pending hero IDs, encounter outcome, seeded RNG and active rules. `get_unit(id)`, `get_deck(hero_id)`, `make_view_snapshot()`. The resolver owns battle mutations. |
+| Combatant | Unit ID, HP, max HP, block, counters, tokens and statuses. Reuse `take_damage(amount)`, `heal(amount)`, `add_block(amount)`, `clear_block()` as low-level updates. The resolver records before and after values and handles defeat. Look up position through Board when resolving rules. |
+| Board | Cell-to-unit occupancy, reverse lookup and Mark overlay. `unit_at(cell)`, `cells_of(unit_id)`, `front_cell_of(cell)`, `are_adjacent(a, b)`, `move_or_swap(unit_id, cell) -> MoveOutcome`, `remove_unit(unit_id)`, `move_mark(owner_id, cell)`. A swap reports both units' old and new cells. |
+| TargetingRules | `legal_options(state, source_id, target_spec)` and `resolve_hits(state, attack_request) -> Array[HitTarget]`. Apply attack range, die patterns, shielding and per-cell/per-unit policy in one place. Keep target order stable. |
+| Deck | Runtime `CardInstance` records contain an instance ID and CardDefinition reference. `hand_contains(id)`, `move_card(id, from_zone, to_zone)`, `draw(count, rng)`, `reshuffle(rng)`. The resolver assigns why a card moved, including play or a specific payment. |
+
+### Action resolution
+
+| Class or value | Methods or fields |
+| --- | --- |
+| CombatCommand | Tagged request with variants for play card, use ability, Reposition and end turn. Carries actor ID, card instance or ability ID where applicable, PaymentSelection and choices keyed by slot. PaymentSelection names discard IDs and amounts of Earth or other resources. |
+| CombatResolver | `start_battle(setup) -> CombatResult`, `submit(command) -> CommandOutcome`, `answer_choice(choice_id, selection) -> CommandOutcome`. Private operations include `validate_command()`, `commit_payment()`, `advance_action()`, `perform_attack()`, `apply_damage()`, `drain_reactions()`, and `advance_phase()`. This object is the single entry point for combat writes. |
+| CommandOutcome | Either rejected with a reason, resolved with a result, or awaiting choice with the result segment and a ChoiceRequest. The request carries a unique ID, choice type, legal options and selection constraints. |
+| ActionFrame | Resolver-owned state for an action in progress. Keeps the action ID, actor, payment record, ordered step cursor, child frame or repeat position, scoped outputs and pending choice. A paused action keeps this frame, allowing `answer_choice` to continue without paying twice or rerunning earlier steps. |
+| EffectContext | `query_targets(spec)`, `get_choice(slot)`, `get_output(slot)`, and operations such as `attack(request)`, `move(unit_id, cell)`, `draw(unit_id, count)`, `change_counter(request)`. Operations delegate to the resolver. A typed StepOutcome describes completion, child steps to schedule, or a choice request with a continuation step. |
+| CombatRule | `modify_attack(context, attack) -> AttackAdjustment` or `react(context, fact) -> Array[Reaction]` for rules that use those hooks. Each installed rule has an owner, priority, stable install order and lifetime. Match with explicit timing and predicates. Use small implementations for Slip Stream, Battle Frenzy, Mark and one-shot token modifiers. |
+
+A modifier proposes adjustments and resource spends while the resolver calculates a hit. Commit spends once alongside the operation. An after-effect proposes operations or child steps for the resolver to run. This keeps Quick Attack's restore tied to its own spend, even if a reaction changes Momentum in between. Use phase, payment and card boundaries as explicit resolver operations and facts so effects can attach there too. A nested blessing invocation uses the same ability logic with an explicit cost and usage policy and its own cause ID.
+
+After each operation, or after a batch of simultaneous hits, finish immediate consequences and drain eligible reactions before advancing the parent action. Capture queued follow-up operations and the continuation if a reaction needs a choice. For example, Mark can ask where to move after a swap, then the original card can resume. Record facts in one ordered result buffer. Rules use the resolver's internal queue, while presentation receives completed segments. Once all active heroes have ended their turn and the Hero Phase queue has settled, the resolver runs the Hero Phase end effects, enemy actions and the next Hero Phase in order. The agreed draw and block timing goes in those phase operations.
+
+### Results and animation
+
+| Class | Methods or fields |
+| --- | --- |
+| CombatResult | Action ID, segment ID, ordered facts and final BattleViewSnapshot. Fact types include card reveal, payment, unit moved, damage applied, block or HP changed, counter or token changed, draw, phase changed and defeated. A fact can carry a cause ID and simultaneous group ID. Damage facts include before/after HP and block so a separate fact for the same delta is unnecessary. |
+| BattleController | `start_encounter(setup)`, `submit_player_action(command)`, `answer_choice(id, selection)`, `skip_animation()`. Forward accepted result segments to the presenter. Retain a pending choice until its segment is visible, then surface it to the player. |
+| CombatPresenter | `reset(snapshot)`, `enqueue(result)`, `skip_to_latest()`, `clear()`, and `playback_idle` signal. Own the active batch and queue. Map each fact to a reusable cue, apply its display values at the cue, and reconcile the snapshot at batch end. Skip applies the most recent snapshot, including the active batch when the queue is empty. Cancel active work and ignore stale animation completions after skip or reset. |
+| BoardView and HandView | `apply_snapshot(view_state)` and view operations such as `animate_move(unit_id, from_cell, to_cell)`, `show_hit(unit_id, hit)`, and `show_card_play(card_id, instance_id)`. The presenter sequences these. Health bars take explicit displayed values. |
+
+## Pattern review
+
+| Decision | Fit for this game and when to reconsider |
+| --- | --- |
+| Data-driven composition using typed steps | Keep it. The starting decks already share attacks, draws, moves, branches and repeats. Composition puts costs and values within the designer's reach. Use named scripted rules for interactions with lifetime or timing across actions. A script per card is faster for a one-off prototype. A general-purpose graph earns its cost only if the designer repeatedly needs compositions the step editor cannot express cleanly. |
+| Commands and one synchronous resolver | Keep a small tagged request and a single resolver. Exact payments, legal targets and shared Hero Phase need one place to decide whether an action can proceed. Direct card-to-unit calls spread those checks across cards. Separate command classes or undoable commands add ceremony for the current action set. Use a resumable frame when a real dependent choice requires one. |
+| Explicit hooks and a local reaction queue | Keep both jobs explicit. Slip Stream and Light need to change a hit before application, Battle Frenzy and Energy Surge react to committed outcomes, and Luminous needs the payment reason. Broadcasting every mutation over Godot signals makes ordering hard to inspect. Hard-coding every talent inside damage or Reposition would work for one class and becomes harder to extend as token and enemy rules overlap. Start with the hooks the starter rules actually use. |
+| Ordered results and one presenter | Keep this boundary. Multi-hit cards, swaps and reactions justify a playback queue. Direct live bindings are adequate for static previews. Using animation callbacks to resolve damage ties game rules to cue completion, which complicates skip and headless tests. Persisting every event as the source of truth would add replay and migration work. Use live battle state and keep the result batches needed for playback and diagnostics. |
+| Godot Resource definitions and RefCounted runtime state | Keep the split. Designers need shared saved definitions, while two copies of a card and two battles need independent mutable state. Scene Nodes are appropriate for views and controllers. A full entity-component system adds infrastructure before the small board and starter roster require it. |
+
+## Rules to confirm with the designer
+
+- Define how starting hands, unspent cards, reshuffles, and the played card interact with payment, including whether excess Earth or bonus discards are allowed. Confirm when a hero may undo ending their turn and when the phase transition becomes final.
+- Confirm whether damage hooks fire on blocked hits, how self-damage contributes to Rage, when Momentum is consumed, and whether Lightning, Light and Dark apply per hit or per whole attack. Define stacking and consumption for multiple copies. Decide who activates Fire and at which Enemy Phase timing.
+- Confirm when block expires, the scope of Rally and Heartseeker, and which turn boundary triggers Tailwind and blessing usage resets. Decide whether Transcendence spends blessing once or per invocation, whether it bypasses the usage limit, and whether each use gets a new target.
+- Define whether repeated attacks lock targets or pick each time, and what happens when a target dies. Confirm the slash notation for Thrust, Rapid Jab and Arrow Storm. Set enemy shielding and footprint hit policies, including how an area covering several occupied cells applies damage.
+- Specify whether Mark follows a unit or stays in a cell, what happens when its host moves or dies, and whether a Huntress swap grants optional or mandatory relocation. Confirm the source and target of Soul Warden's HP thresholds, tie-breaking for lowest HP, and priorities among end-of-phase effects.
+
+## First implementation slice
+
+1. Author Stab, Acrobatics, and Quick Attack as Resources. Exercise exact discard payment, board movement, Slip Stream, melee range and the spend/restore interaction headlessly.
+2. Animate those actions through one presenter. Verify that damage lands at impact, swap occupancy is portrayed correctly, and skip reaches the same visible state as normal playback.
+3. Add Wide Guard and Rapid Jab to exercise allocations, repeated hits and a target dying mid-action. Add Wild Abandon with Energy Surge and a blessing paid with Luminous to exercise cross-rule ordering and payment attribution. Add one enemy with several occupied cells and a die-selected area.
+4. Build the designer workspace over the schema validated by those examples. Have the designer duplicate and tune a card, diagnose an invalid configuration, and run it in the sandbox. Expand to the remaining starter content and confirmed rule policies.

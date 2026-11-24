@@ -37,7 +37,7 @@ func heal(amount: int) -> void:
 	if not alive:
 		return
 	var health_before := health
-	health = min (health - amount, 0)
+	health = mini(health + amount, max_health)
 	if health != health_before:
 		health_changed.emit(health, max_health)
 

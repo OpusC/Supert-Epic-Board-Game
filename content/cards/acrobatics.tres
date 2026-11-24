@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CardDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/model/combat/card_definition.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/model/combat/effect_step.gd" id="2"]
+
+[sub_resource type="Resource" id="Step_0"]
+script = ExtResource("2")
+kind = 1
+amount = 0
+
+[sub_resource type="Resource" id="Step_1"]
+script = ExtResource("2")
+kind = 2
+amount = 1
+
+[resource]
+script = ExtResource("1")
+id = &"acrobatics"
+display_name = "Acrobatics"
+cost = 1
+rules_text = "Reposition, then gain 1 Momentum."
+steps = Array[ExtResource("2")]([SubResource("Step_0"), SubResource("Step_1")])

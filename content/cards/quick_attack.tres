@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CardDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/model/combat/card_definition.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/model/combat/effect_step.gd" id="2"]
+
+[sub_resource type="Resource" id="Step_0"]
+script = ExtResource("2")
+kind = 0
+amount = 1
+
+[sub_resource type="Resource" id="Step_1"]
+script = ExtResource("2")
+kind = 3
+amount = 0
+
+[resource]
+script = ExtResource("1")
+id = &"quick_attack"
+display_name = "Quick Attack"
+cost = 2
+rules_text = "Deal 1 melee damage, then regain the Momentum spent on the hit."
+steps = Array[ExtResource("2")]([SubResource("Step_0"), SubResource("Step_1")])
