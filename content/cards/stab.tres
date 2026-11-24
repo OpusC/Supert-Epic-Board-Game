@@ -1,12 +1,11 @@
-[gd_resource type="Resource" script_class="CardDefinition" format=3]
+[gd_resource type="Resource" script_class="CardDefinition" format=3 uid="uid://djf05yui2n58m"]
 
-[ext_resource type="Script" path="res://scripts/model/combat/card_definition.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/model/combat/effect_step.gd" id="2"]
+[ext_resource type="Script" uid="uid://datydcjpcats3" path="res://scripts/model/combat/card_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bld3dfo74l0te" path="res://scripts/model/combat/effect_step.gd" id="2"]
 
-[sub_resource type="Resource" id="Step_0"]
+[sub_resource type="Resource" id="Resource_ksywt"]
 script = ExtResource("2")
-kind = 0
-amount = 2
+amount = 5
 
 [resource]
 script = ExtResource("1")
@@ -14,4 +13,4 @@ id = &"stab"
 display_name = "Stab"
 cost = 1
 rules_text = "Deal 2 melee damage."
-steps = Array[ExtResource("2")]([SubResource("Step_0")])
+steps = Array[ExtResource("2")]([SubResource("Resource_ksywt")])

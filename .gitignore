@@ -4,7 +4,7 @@
 export.cfg
 export_credentials.cfg
 
-# Godot-generated import files for uncompressed assets
+# Godot-generated translation files
 *.translation
 
 # Mono-specific, if you ever add C#
@@ -14,4 +14,4 @@ mono_crash.*.json
 
 # System/editor files
 .DS_Store
-*.tmp``
+*.tmp
